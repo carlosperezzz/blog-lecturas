@@ -34,7 +34,23 @@ header h1 em{font-style:italic;color:var(--amber-light)}
 nav{background:var(--ink);border-top:1px solid rgba(247,242,232,.08);position:sticky;top:0;z-index:200}
 .nav-inner{max-width:1100px;margin:0 auto;padding:0 40px;display:flex;overflow-x:auto}
 nav a{font-family:'DM Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:rgba(247,242,232,.5);text-decoration:none;padding:16px 20px;border-bottom:2px solid transparent;transition:color .2s,border-color .2s;white-space:nowrap}
-nav a:hover{color:var(--amber-light);border-bottom-color:var(--amber-light)}
+nav a:hover,nav a.active{color:var(--amber-light);border-bottom-color:var(--amber-light)}
+/* SEARCH BAR */
+.search-wrap{position:relative;margin-bottom:48px}
+.search-input{width:100%;padding:16px 20px 16px 48px;font-family:'Lora',serif;font-size:16px;font-style:italic;background:var(--cream);border:1px solid var(--line);border-radius:2px;color:var(--ink);outline:none;transition:border-color .2s,box-shadow .2s}
+.search-input:focus{border-color:var(--amber);box-shadow:0 0 0 3px rgba(200,136,42,.1)}
+.search-input::placeholder{color:var(--muted)}
+.search-icon{position:absolute;left:16px;top:50%;transform:translateY(-50%);color:var(--amber);font-size:18px;pointer-events:none}
+.search-count{position:absolute;right:16px;top:50%;transform:translateY(-50%);font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:1px}
+.search-results{display:none}
+.search-results.active{display:grid;grid-template-columns:repeat(3,1fr);gap:28px}
+/* ALL BOOKS */
+.books-alpha{display:grid;grid-template-columns:repeat(3,1fr);gap:28px}
+.books-alpha-row{display:contents}
+.alpha-letter{grid-column:1/-1;font-family:'Playfair Display',serif;font-size:32px;font-weight:900;color:var(--amber);padding:24px 0 8px;border-bottom:1px solid var(--line);margin-top:16px}
+.pagination{display:flex;justify-content:center;gap:8px;margin-top:48px;flex-wrap:wrap}
+.page-btn{font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1px;background:var(--cream);border:1px solid var(--line);padding:8px 14px;cursor:pointer;border-radius:2px;transition:background .2s,color .2s;color:var(--ink)}
+.page-btn:hover,.page-btn.active{background:var(--amber);color:var(--paper);border-color:var(--amber)}
 /* MAIN */
 main{max-width:1100px;margin:0 auto;padding:0 40px}
 section{padding:80px 0;border-bottom:1px solid var(--line)}
@@ -220,6 +236,7 @@ footer strong{color:var(--amber-light)}
     <a href="#ultimas">Últimas lecturas</a>
     <a href="#favoritos">Favoritos</a>
     <a href="#estanteria">Estantería</a>
+    <a href="#mislibros">Mis libros</a>
     <a href="#autores">Autores</a>
     <a href="#leyendo">Leyendo ahora</a>
   </div>
@@ -256,8 +273,21 @@ footer strong{color:var(--amber-light)}
   <section id="autores">
     <p class="s-label">✦ Mis autores</p>
     <h2 class="s-title">Voces que <em>repito</em></h2>
-    <p class="section-note">Autores con 3 o más libros leídos.</p>
+    <p class="section-note">Autores con 3 o más libros leídos. Haz clic para ver todos sus libros.</p>
     <div class="authors-grid fi" id="authorsGrid"></div>
+  </section>
+
+  <section id="mislibros">
+    <p class="s-label">✦ El catálogo completo</p>
+    <h2 class="s-title">Mis <em>libros</em></h2>
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" class="search-input" id="searchInput" placeholder="Buscar por título, autor...">
+      <span class="search-count" id="searchCount"></span>
+    </div>
+    <div class="search-results books-grid" id="searchResults"></div>
+    <div class="books-alpha fi" id="alphaGrid"></div>
+    <div class="pagination" id="pagination"></div>
   </section>
   <section id="leyendo">
     <p class="s-label">✦ Ahora mismo</p>
@@ -275,7 +305,7 @@ footer strong{color:var(--amber-light)}
 const STATS   = {"total_read": 1372, "avg_rating": 3.86, "total_pages": 395998, "to_read": 39, "five_stars": 214, "unique_authors": 850, "updated": "25 Feb 2026"};
 const YEARS   = [{"year": 2011, "count": 19}, {"year": 2012, "count": 41}, {"year": 2013, "count": 33}, {"year": 2014, "count": 50}, {"year": 2015, "count": 60}, {"year": 2016, "count": 66}, {"year": 2017, "count": 94}, {"year": 2018, "count": 164}, {"year": 2019, "count": 128}, {"year": 2020, "count": 136}, {"year": 2021, "count": 109}, {"year": 2022, "count": 118}, {"year": 2023, "count": 129}, {"year": 2024, "count": 117}, {"year": 2025, "count": 91}, {"year": 2026, "count": 14}];
 const RATINGS = [{"stars": 5, "count": 214}, {"stars": 4, "count": 761}, {"stars": 3, "count": 375}, {"stars": 2, "count": 16}];
-const RECENT  = [{"id": 107526264, "title": "Las tempestálidas", "author": "Georgi Gospodinov", "isbn": "9788417617349", "rating": 4, "avg_rating": 3.74, "pages": 412, "date": "29 Jul 2025", "date_iso": "2025-07-29", "date_added": "2025/07/07", "publisher": "Fulgencio Pimentel", "binding": "Hardcover", "year_pub": "2022", "review": "Las tempestálidas, de Gueorgui Gospodínov: refugio de nostalgia y piel del tiempo  Las tempestálidas es una novela extraordinaria. Ganadora del Premio Internacional Booker 2023, plantea una premisa inquietante y poética: clínicas que recrean décadas pasadas para pacientes con Alzheimer, los llamados “cronorrefugios” —espacios donde se revive el tiempo perdido en busca de consuelo o escape⁤ ￼ ￼ ￼.  La trama arranca en Zúrich, donde Gaustín, un psiquiatra búlgaro, inaugura la primera clínica del pasado. A medida que el concepto arraiga, personas sanas también acuden en masa: ya no es solo memoria clínica, sino un refugio para quienes rehúyen el presente. Pasa de clínica a red continental, y cada país llega a votar qué década del siglo XX debería vivir como experimento cultural⁤ ￼ ￼ ￼ ￼.  Narrada desde un narrador cercano al propio autor, la voz de Gospodínov es flâneur: recorre Europa física y temporalmente, colecciona objetos como vehículos de evocación y reflexiona sobre cómo los recuerdos y la nostalgia pueden moldear al individuo y a la sociedad entera⁤ ￼ ￼ ￼.  No es una distopía clásica. Es más sugerente. Belleza y melancolía conviven con ironía y análisis agudo. El libro interroga: ¿hasta qué punto idealizamos el pasado? ¿Qué precio tiene nuestro anhelo de regresar a épocas más seguras o felices? La introspección lírica se mezcla con metáforas conceptuales que enriquecen la lectura sin sacrificio narrativo⁤ ￼ ￼.  Esto no es solo literatura sobre el tiempo, sino sobre nuestra urgencia contemporánea de construir refugios temporales para huir del caos. Revela que la memoria colectiva es también una construcción ideológica, capaz de atrapar a pueblos enteros en un eco repetido del ayer⁤ ￼ ￼.  Leer Las tempestálidas es un recorrido entre ensueños y espejismos. Su estructura fragmentada y su naturaleza híbrida —mitad ensayo, mitad ficción— cautivan desde el primer capítulo. El resultado es una experiencia literaria que desafía nuestras certezas sobre el presente y el futuro, mientras reformula nuestra relación con lo que fuimos⁤ ￼ ￼.  Altamente recomendable para quien busca una novela que mezcla filosofía, distopía literaria y poesía del tiempo, todo en una propuesta sorprendente que deja poso emocional e intelectual.", "link": "https://www.goodreads.com/book/show/107526264", "image_url": "covers/107526264.jpg", "shelf": "read"}, {"id": 209302813, "title": "Las fieras", "author": "Clara Usón", "isbn": "9788432243622", "rating": 4, "avg_rating": 3.73, "pages": 376, "date": "01 Jul 2025", "date_iso": "2025-07-01", "date_added": "2025/06/26", "publisher": "Seix Barral", "binding": "Paperback", "year_pub": "2024", "review": "", "link": "https://www.goodreads.com/book/show/209302813", "image_url": "covers/209302813.jpg", "shelf": "read"}, {"id": 4478299, "title": "Una lectora nada común", "author": "Alan Bennett", "isbn": "9788433974754", "rating": 4, "avg_rating": 3.73, "pages": 119, "date": "25 Jun 2025", "date_iso": "2025-06-25", "date_added": "2025/06/22", "publisher": "Anagrama", "binding": "Paperback", "year_pub": "2008", "review": "", "link": "https://www.goodreads.com/book/show/4478299", "image_url": "covers/4478299.jpg", "shelf": "read"}, {"id": 936877, "title": "Loxandra", "author": "Μαρία Ιορδανίδου", "isbn": "9782742701032", "rating": 4, "avg_rating": 4.12, "pages": 256, "date": "12 May 2025", "date_iso": "2025-05-12", "date_added": "2025/05/01", "publisher": "ACTES SUD", "binding": "Hardcover", "year_pub": "1999", "review": "", "link": "https://www.goodreads.com/book/show/936877", "image_url": "covers/936877.jpg", "shelf": "read"}, {"id": 1032776, "title": "El inmoralista", "author": "André Gide", "isbn": "9788437607405", "rating": 3, "avg_rating": 3.54, "pages": 174, "date": "25 Mar 2025", "date_iso": "2025-03-25", "date_added": "2025/03/23", "publisher": "Cátedra", "binding": "Paperback", "year_pub": "2006", "review": "", "link": "https://www.goodreads.com/book/show/1032776", "image_url": "covers/1032776.jpg", "shelf": "read"}, {"id": 187622892, "title": "Alas de sangre (Empíreo, #1)", "author": "Rebecca Yarros", "isbn": "9786073901802", "rating": 4, "avg_rating": 4.57, "pages": 522, "date": "17 Mar 2025", "date_iso": "2025-03-17", "date_added": "2025/03/08", "publisher": "Planeta", "binding": "Paperback", "year_pub": "2023", "review": "", "link": "https://www.goodreads.com/book/show/187622892", "image_url": "covers/187622892.jpg", "shelf": "read"}, {"id": 3336370, "title": "La casa de papel", "author": "Carlos María Domínguez", "isbn": "9788439720812", "rating": 4, "avg_rating": 3.73, "pages": 120, "date": "08 Mar 2025", "date_iso": "2025-03-08", "date_added": "2025/03/08", "publisher": "LITERATURA RANDOM HOUSE", "binding": "", "year_pub": "2007", "review": "", "link": "https://www.goodreads.com/book/show/3336370", "image_url": "covers/3336370.jpg", "shelf": "read"}, {"id": 123136728, "title": "Orbital", "author": "Samantha Harvey", "isbn": "9780802161543", "rating": 4, "avg_rating": 3.49, "pages": 224, "date": "06 Mar 2025", "date_iso": "2025-03-06", "date_added": "2025/03/03", "publisher": "Atlantic Monthly Press", "binding": "Hardcover", "year_pub": "2023", "review": "", "link": "https://www.goodreads.com/book/show/123136728", "image_url": "covers/123136728.jpg", "shelf": "read"}, {"id": 30627152, "title": "Mientras haya bares", "author": "Juan Tallón", "isbn": "9788494434068", "rating": 4, "avg_rating": 3.85, "pages": 350, "date": "02 Mar 2025", "date_iso": "2025-03-02", "date_added": "2025/02/21", "publisher": "Círculo de tiza", "binding": "Paperback", "year_pub": "2016", "review": "", "link": "https://www.goodreads.com/book/show/30627152", "image_url": "covers/30627152.jpg", "shelf": "read"}];
+const RECENT  = [{"id": 99404826, "title": "La cuarta mirada (Spanish Edition)", "author": "Maria Jose Alfonso Bartolome", "isbn": "", "rating": 5, "avg_rating": 5.0, "pages": 263, "date": "21 Feb 2026", "date_iso": "2026-02-21", "date_added": "2026/02/18", "publisher": "", "binding": "Kindle Edition", "year_pub": "2017", "review": "La cuarta mirada es una historia de resiliencia profunda narrada desde la intimidad de quien ha vivido la adversidad y ha decidido no dejarse vencer por ella. A través de la vida de Clara, acompañamos a una niña cuya infancia queda marcada por experiencias duras que la obligan a crecer antes de tiempo, pero también a encontrar dentro de sí misma una fuerza inesperada. Cada etapa —dolor, aprendizaje, resistencia— refleja cómo la protagonista va transformando su historia y desarrollando esa “cuarta mirada”: la que mira hacia adelante con valentía y esperanza. La novela no se detiene en lo trágico; lo entiende, lo siente y luego lo supera con honestidad emocional. Es un canto a la posibilidad de ser feliz incluso cuando la vida resulta difícil, y un recordatorio de que el pasado puede convertirse en una herramienta de crecimiento en lugar de una carga permanente. Una lectura emotiva y sincera, ideal para quienes buscan historias sobre la fortaleza interior y la esperanza que surge después de atravesar tormentas personales.", "link": "https://www.goodreads.com/book/show/99404826", "image_url": "", "shelf": "read"}, {"id": 244304208, "title": "NO SOY EL TÍPICO CUENTO DE NAVIDAD:: Un cuento donde la magia y el desastre van de la mano. (Spanish Edition)", "author": "Maria Jose Alfonso Bartolome", "isbn": "", "rating": 5, "avg_rating": 5.0, "pages": 206, "date": "17 Feb 2026", "date_iso": "2026-02-17", "date_added": "2026/02/10", "publisher": "", "binding": "Kindle Edition", "year_pub": "2025", "review": "Si algo define No soy el típico cuento de Navidad es su intención clara desde el propio título: desmontar la idea clásica de las historias navideñas dulces, previsibles y envueltas únicamente en luces y finales perfectos. La novela se mueve en un terreno más humano y cercano, mostrando la Navidad como un escenario donde afloran emociones reales: nostalgia, heridas del pasado, relaciones complejas y la necesidad —a veces silenciosa— de sentirse comprendido. No es una historia que busque idealizar las fiestas, sino usarlas como telón de fondo para hablar de las personas, de sus contradicciones y de esos momentos vitales donde todo parece detenerse y obliga a mirar hacia dentro. A nivel narrativo, el libro combina tono emocional con una mirada contemporánea, alejándose del cuento moral tradicional para apostar por personajes más imperfectos y, precisamente por eso, más creíbles. La autora construye una historia donde lo importante no es la Navidad en sí, sino lo que representa: segundas oportunidades, reconciliaciones posibles y la esperanza de que incluso en los periodos más fríos del año puede aparecer algo cálido. El ritmo suele apoyarse más en la atmósfera y en la evolución emocional que en la acción, lo que hace que la lectura funcione especialmente bien para quien busca una historia íntima, reflexiva y con un punto de melancolía. En conjunto, es una novela que encaja con lectores que quieren sentir la Navidad desde un prisma menos idealizado y más emocional, donde la verdadera magia no está en lo extraordinario, sino en los pequeños gestos y en las decisiones que cambian una vida.", "link": "https://www.goodreads.com/book/show/244304208", "image_url": "", "shelf": "read"}, {"id": 245410725, "title": "Atrévete a soñar (Spanish Edition)", "author": "Marina Redondo", "isbn": "", "rating": 5, "avg_rating": 4.92, "pages": 144, "date": "10 Feb 2026", "date_iso": "2026-02-10", "date_added": "2026/02/05", "publisher": "", "binding": "Kindle Edition", "year_pub": "2025", "review": "Atrévete a soñar funciona como una reinterpretación emocional del mito de Peter Pan, pero llevándolo a un terreno más íntimo y contemporáneo. La historia no se queda solo en la aventura o en la fantasía del “no crecer”, sino que explora el precio real de quedarse atrapado entre lo que fuimos y lo que estamos llamados a ser.  La novela construye un puente entre la nostalgia de la infancia y la necesidad de avanzar. A través de sus personajes —con ecos claros del universo de Nunca Jamás— se percibe el conflicto entre refugiarse en los sueños o tener el valor de vivirlos en el mundo real. Hay momentos que transmiten sensación de hogar, de pertenencia, y otros que empujan hacia el cambio, hacia aceptar que crecer no siempre significa perder la magia.  El tono es cercano y accesible, con una sensibilidad juvenil pero con reflexiones que pueden tocar también a lectores adultos. Destaca especialmente la forma en la que mezcla emoción, identidad y segundas oportunidades, dejando una sensación final de esperanza: soñar no es escapar, es encontrar el valor para avanzar.  En conjunto, es una lectura que conecta con esa parte de todos nosotros que aún mira al cielo preguntándose si todavía es posible creer en lo imposible… y decidir, aun así, intentarlo.", "link": "https://www.goodreads.com/book/show/245410725", "image_url": "", "shelf": "read"}, {"id": 209412472, "title": "Cuando una meiga se cruza en tu Camino: Una bruja puede cambiar tu destino (Spanish Edition)", "author": "María Alfonso Bartolome", "isbn": "", "rating": 5, "avg_rating": 5.0, "pages": 98, "date": "07 Feb 2026", "date_iso": "2026-02-07", "date_added": "2026/02/07", "publisher": "", "binding": "Kindle Edition", "year_pub": "2024", "review": "Hay historias que no hablan solo de magia, sino de los caminos invisibles que nos cambian sin avisar. Cuando una meiga se cruza en tu camino se mueve justo ahí: entre la tradición, el misterio y ese aire atlántico donde lo real y lo imposible parecen darse la mano. La novela juega con el imaginario de las meigas —figuras muy ligadas al folclore del norte— para construir una historia donde el destino, las decisiones y las emociones pesan tanto como lo sobrenatural. No es solo una historia de brujería: es una historia sobre lo que ocurre cuando algo (o alguien) te obliga a mirarte por dentro y a replantearte tu rumbo. Es un libro que se lee con sensación de leyenda susurrada al oído, con ese tono entre melancólico y mágico que deja poso después de cerrar la última página.", "link": "https://www.goodreads.com/book/show/209412472", "image_url": "", "shelf": "read"}, {"id": 26524859, "title": "Intemporalis (Spanish Edition)", "author": "Michèle  Rodríguez", "isbn": "9781511959759", "rating": 5, "avg_rating": 4.8, "pages": 244, "date": "05 Feb 2026", "date_iso": "2026-02-05", "date_added": "2026/01/30", "publisher": "CreateSpace Independent Publishing Platform", "binding": "Paperback", "year_pub": "2015", "review": "Intemporalis es de esas historias que parecen susurrarte desde otra época. La novela nos lleva a la Normandía de finales de los 90, donde Alex descubre un amor imposible que desafía el tiempo, la guerra y la propia lógica de la vida.  Entre niebla, un lago y una vieja mansión, la historia mezcla emoción, destino y ese tipo de sentimientos que no entienden de calendarios. No es solo una historia de amor: habla de crecer, de elegir, de luchar contra lo que parece inevitable.  Es un libro que se siente atemporal, delicado y con ese punto de magia que hace que cierres la última página con la sensación de haber vivido algo más que una historia.", "link": "https://www.goodreads.com/book/show/26524859", "image_url": "", "shelf": "read"}, {"id": 58363668, "title": "El caso de la chica del pelo verde", "author": "Maria Jose Alfonso Bartolome", "isbn": "", "rating": 5, "avg_rating": 4.53, "pages": 291, "date": "30 Jan 2026", "date_iso": "2026-01-30", "date_added": "2026/01/27", "publisher": "", "binding": "Kindle Edition", "year_pub": "2020", "review": "El caso de la chica del pelo verde es una novela intensa y humana que te agarra desde el primer momento. La historia sigue a Idoia, una adolescente emocionalmente frágil que ha crecido en un entorno caótico, y a Clara, una psicóloga infantil que decide acompañarla más allá de lo profesional. La relación entre ambas y el apoyo que Idoia encuentra en el arte y en quienes la rodean dibuja una trama profunda y conmovedora.  La novela se desarrolla en la isla de La Palma, y ese paisaje no es solo un escenario: acompaña y enmarca los cambios internos de los personajes, reflejando sus miedos, confusiones y pequeñas victorias. Los temas de identidad, angustia y crecimiento personal se entrelazan con sensibilidad y verdad, haciendo que la lectura conecte tanto con la mente como con el corazón del lector.  Una historia recomendable para quienes buscan un thriller con alma, personajes complejos y una mirada honesta sobre la lucha por encontrar equilibrio y sentido propio.", "link": "https://www.goodreads.com/book/show/58363668", "image_url": "", "shelf": "read"}, {"id": 199259636, "title": "El triángulo del silencio", "author": "Michèle  Rodríguez", "isbn": "9798858522942", "rating": 5, "avg_rating": 4.64, "pages": 258, "date": "27 Jan 2026", "date_iso": "2026-01-27", "date_added": "2026/01/24", "publisher": "AMAZON", "binding": "Paperback", "year_pub": "2023", "review": "El triángulo del silencio es una novela que no se olvida fácil: aborda el acoso escolar con una honestidad que duele, conmueve y, al mismo tiempo, abre los ojos. La historia arranca cuando Cecilia, una profesora, recibe la cartera de Esther, una adolescente cuyo diario revela el tormento silencioso al que la someten sus compañeros. A partir de ahí, se despliega una carrera contrarreloj para comprender lo que ocurre detrás de puertas cerradas y evitar un desenlace trágico que parece inminente.  Lo más impactante de la novela es cómo Michèle Rodríguez pone al lector dentro de la mente de quienes sufren, de quienes observan y de quienes callan, mostrando que el silencio no es vacío: es complicidad, miedo y, a veces, dolor profundo. Además, la historia no solo denuncia la crueldad del bullying, sino que también ilumina la importancia de la empatía, la solidaridad y la voz de quienes deciden no mirar hacia otro lado. Una lectura intensa, necesaria y sorprendentemente humana, que te invita a reflexionar sobre lo que callamos y lo que podríamos cambiar si nos atreviéramos a hablar.", "link": "https://www.goodreads.com/book/show/199259636", "image_url": "", "shelf": "read"}, {"id": 203303558, "title": "Cárceles de tinta (Spanish Edition)", "author": "Michèle  Rodríguez", "isbn": "", "rating": 5, "avg_rating": 5.0, "pages": 268, "date": "23 Jan 2026", "date_iso": "2026-01-23", "date_added": "2026/01/18", "publisher": "", "binding": "Kindle Edition", "year_pub": "2023", "review": "Cárceles de tinta es una novela juvenil que te atrapa desde el primer sueño recurrente. Damián no entiende por qué vuelve siempre a una playa misteriosa… hasta que una voz pidiendo auxilio lo empuja a descubrir que hay algo más allá de lo que conocía. Pronto se encuentra delante de personajes creados por un escritor, atrapados en un mundo paralelo parecido al nuestro, que ansían libertad y significado propio.  Lo que más me llamó la atención es cómo la autora juega con la idea de que la imaginación es un lugar real: personajes que cobran vida, que sienten, que desean decidir su propio destino. La historia mezcla fantasía, suspense y humanidad con una ligereza que hace que cada página se lea con curiosidad y ganas de saber más. Es una novela ideal si te atraen los mundos que exploran la frontera entre lo imaginario y lo real, con personajes entrañables, situaciones que sorprenden y una reflexión sutil sobre lo que significa ser libre —incluso cuando todo parece trazar tu camino.", "link": "https://www.goodreads.com/book/show/203303558", "image_url": "", "shelf": "read"}, {"id": 208882018, "title": "GEOMANCIA Y HUEVOS FRITOS (Spanish Edition)", "author": "Victoria F. Leffingwell", "isbn": "", "rating": 5, "avg_rating": 4.83, "pages": 250, "date": "20 Jan 2026", "date_iso": "2026-01-20", "date_added": "2026/01/16", "publisher": "", "binding": "Kindle Edition", "year_pub": "2024", "review": "Geomancia y huevos fritos es una novela sorprendente que combina lo cotidiano con lo inesperado: desde una especialista en geomancia —una práctica ancestral que busca interpretar la tierra y sus señales", "link": "https://www.goodreads.com/book/show/208882018", "image_url": "", "shelf": "read"}];
 const TOP5    = [{"id": 205169773, "title": "Los aerostatos", "author": "Amélie Nothomb", "isbn": "9788433922311", "rating": 5, "avg_rating": 3.65, "pages": 144, "date": "31 Jul 2024", "date_iso": "2024-07-31", "date_added": "2024/07/31", "publisher": "Editorial Anagrama", "binding": "Paperback", "year_pub": "2024", "review": "", "link": "https://www.goodreads.com/book/show/205169773", "image_url": "covers/205169773.jpg", "shelf": "read"}, {"id": 1260753, "title": "El gato encerrado", "author": "Andrés Trapiello", "isbn": "9788487101281", "rating": 5, "avg_rating": 4.03, "pages": 200, "date": "05 Mar 2024", "date_iso": "2024-03-05", "date_added": "2024/02/17", "publisher": "Pre-Textos", "binding": "Hardcover", "year_pub": "1990", "review": "", "link": "https://www.goodreads.com/book/show/1260753", "image_url": "covers/1260753.jpg", "shelf": "read"}, {"id": 193575492, "title": "Maldita Roma: La conquista del poder de Julio César (Julio César, #2)", "author": "Santiago Posteguillo", "isbn": "9788466676564", "rating": 5, "avg_rating": 4.68, "pages": 896, "date": "28 Dec 2023", "date_iso": "2023-12-28", "date_added": "2023/12/18", "publisher": "Ediciones B", "binding": "Hardcover", "year_pub": "2024", "review": "", "link": "https://www.goodreads.com/book/show/193575492", "image_url": "covers/193575492.jpg", "shelf": "read"}, {"id": 60757868, "title": "La aurora cuando surge", "author": "Manuel Astur", "isbn": "9788418370892", "rating": 5, "avg_rating": 4.17, "pages": 192, "date": "08 Jul 2023", "date_iso": "2023-07-08", "date_added": "2023/06/26", "publisher": "Acantilado", "binding": "Paperback", "year_pub": "2022", "review": "", "link": "https://www.goodreads.com/book/show/60757868", "image_url": "covers/60757868.jpg", "shelf": "read"}, {"id": 34538922, "title": "El amor, ese viejo neón", "author": "Karmelo C. Iribarren", "isbn": "9788403515987", "rating": 5, "avg_rating": 3.63, "pages": 136, "date": "16 May 2023", "date_iso": "2023-05-16", "date_added": "2023/05/15", "publisher": "Aguilar", "binding": "Paperback", "year_pub": "2017", "review": "", "link": "https://www.goodreads.com/book/show/34538922", "image_url": "covers/34538922.jpg", "shelf": "read"}, {"id": 60292205, "title": "Malasanta", "author": "Antonio Tocornal", "isbn": "9788417453930", "rating": 5, "avg_rating": 4.31, "pages": 208, "date": "28 Feb 2023", "date_iso": "2023-02-28", "date_added": "2023/02/28", "publisher": "Fundación José Manuel Lara", "binding": "Paperback", "year_pub": "2022", "review": "", "link": "https://www.goodreads.com/book/show/60292205", "image_url": "covers/60292205.jpg", "shelf": "read"}, {"id": 60466578, "title": "Hierba", "author": "Keum Suk Gendry-Kim", "isbn": "9788418052071", "rating": 5, "avg_rating": 4.54, "pages": 488, "date": "05 Feb 2023", "date_iso": "2023-02-05", "date_added": "2023/02/02", "publisher": "Reservoir Books", "binding": "Paperback", "year_pub": "2022", "review": "", "link": "https://www.goodreads.com/book/show/60466578", "image_url": "covers/60466578.jpg", "shelf": "read"}, {"id": 12699743, "title": "Yo confieso", "author": "Jaume Cabré", "isbn": "9788423345083", "rating": 5, "avg_rating": 4.45, "pages": 859, "date": "07 Jan 2023", "date_iso": "2023-01-07", "date_added": "2022/12/26", "publisher": "Destino", "binding": "Paperback", "year_pub": "2011", "review": "", "link": "https://www.goodreads.com/book/show/12699743", "image_url": "covers/12699743.jpg", "shelf": "read"}, {"id": 13128458, "title": "Hambre", "author": "Knut Hamsun", "isbn": "9788479602048", "rating": 5, "avg_rating": 4.04, "pages": 216, "date": "29 Dec 2022", "date_iso": "2022-12-29", "date_added": "2017/05/16", "publisher": "Ediciones de la Torre", "binding": "Paperback", "year_pub": "1997", "review": "", "link": "https://www.goodreads.com/book/show/13128458", "image_url": "covers/13128458.jpg", "shelf": "read"}, {"id": 61079497, "title": "Agua y jabón: Apuntes sobre elegancia involuntaria", "author": "Marta D. Riezu", "isbn": "9788433961334", "rating": 5, "avg_rating": 3.73, "pages": 240, "date": "11 Dec 2022", "date_iso": "2022-12-11", "date_added": "2022/12/04", "publisher": "Anagrama", "binding": "Paperback", "year_pub": "2022", "review": "", "link": "https://www.goodreads.com/book/show/61079497", "image_url": "covers/61079497.jpg", "shelf": "read"}, {"id": 28097465, "title": "La casa", "author": "Paco Roca", "isbn": "9788416251001", "rating": 5, "avg_rating": 4.46, "pages": 136, "date": "28 Nov 2022", "date_iso": "2022-11-28", "date_added": "2022/11/28", "publisher": "Astiberri", "binding": "Hardcover", "year_pub": "2015", "review": "", "link": "https://www.goodreads.com/book/show/28097465", "image_url": "covers/28097465.jpg", "shelf": "read"}, {"id": 62903578, "title": "Cuando era divertido", "author": "Eloy Moreno", "isbn": "9788466673303", "rating": 5, "avg_rating": 3.82, "pages": 304, "date": "22 Nov 2022", "date_iso": "2022-11-22", "date_added": "2022/11/20", "publisher": "Ediciones B", "binding": "Paperback", "year_pub": "2022", "review": "", "link": "https://www.goodreads.com/book/show/62903578", "image_url": "covers/62903578.jpg", "shelf": "read"}];
 const AUTHORS = [{"name": "Arturo Pérez-Reverte", "count": 17, "avg": 3.8, "pages": 5716}, {"name": "Camilla Läckberg", "count": 17, "avg": 3.7, "pages": 7050}, {"name": "Haruki Murakami", "count": 16, "avg": 3.8, "pages": 4667}, {"name": "Stephen  King", "count": 13, "avg": 4.1, "pages": 5619}, {"name": "Juan Gómez-Jurado", "count": 12, "avg": 4.2, "pages": 5580}, {"name": "Jo Nesbø", "count": 12, "avg": 4.0, "pages": 6082}, {"name": "Santiago Posteguillo", "count": 11, "avg": 4.8, "pages": 8720}, {"name": "Amélie Nothomb", "count": 10, "avg": 3.9, "pages": 1453}, {"name": "Alessandro Baricco", "count": 9, "avg": 4.0, "pages": 1375}, {"name": "Lorenzo Silva", "count": 9, "avg": 3.9, "pages": 3452}];
 const CURRENT = [{"id": 8389371769, "title": "El tesoro de la condesa", "author": "Adolfina Alcañiz Lopezosa", "isbn": "", "rating": 0, "avg_rating": 4.92, "pages": 0, "date": "24 Feb 2026", "date_iso": "2026-02-24", "date_added": "Tue, 24 Fe", "publisher": "", "binding": "", "year_pub": "", "review": "", "link": "https://www.goodreads.com/review/show/8389371769?utm_medium=api&utm_source=rss", "image_url": "covers/8389371769.jpg"}, {"id": 8389371996, "title": "Mentira", "author": "Juan Gómez-Jurado", "isbn": "8466683089", "rating": 0, "avg_rating": 3.51, "pages": 0, "date": "24 Feb 2026", "date_iso": "2026-02-24", "date_added": "Tue, 24 Fe", "publisher": "", "binding": "", "year_pub": "", "review": "", "link": "https://www.goodreads.com/review/show/8389371996?utm_medium=api&utm_source=rss", "image_url": "covers/8389371996.jpg"}];
@@ -440,12 +470,110 @@ function renderShelf(){
 
 function renderAuthors(){
   document.getElementById('authorsGrid').innerHTML=AUTHORS.map(a=>`
-    <div class="author-row">
+    <div class="author-row" onclick="openAuthor(${JSON.stringify(a.name)})" style="cursor:pointer" title="Ver libros de ${esc(a.name)}">
       <span class="a-name">${esc(a.name)}</span>
       <span class="a-books">${a.count} libros</span>
       <span class="a-rating">${a.avg}★</span>
       <span class="a-pages">${(a.pages||0).toLocaleString()} págs</span>
     </div>`).join('');
+}
+
+function openAuthor(authorName){
+  const books = ALL_BOOKS.filter(b => b.author === authorName)
+    .sort((a,b) => (b.date_iso||'').localeCompare(a.date_iso||''));
+  document.getElementById('modalContent').innerHTML = `
+    <div class="modal-header" style="grid-template-columns:1fr">
+      <div class="modal-header-body" style="padding:32px 36px">
+        <p class="modal-badge">✦ ${books.length} libros leídos</p>
+        <h2 class="modal-title">${esc(authorName)}</h2>
+      </div>
+    </div>
+    <div class="modal-body">
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:20px">
+        ${books.map((b,i)=>{
+          const title = cleanTitle(b.title);
+          return `<div onclick='openBook(${JSON.stringify(b)})' style="cursor:pointer;transition:transform .2s" onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform=''">
+            <div style="height:120px;overflow:hidden;border-radius:2px;margin-bottom:8px;background:var(--cream)">${coverHtml(b,i)}</div>
+            <p style="font-family:'Playfair Display',serif;font-size:13px;font-weight:700;line-height:1.3;margin-bottom:3px">${esc(title)}</p>
+            <p style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)">${b.date||''}</p>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  document.getElementById('modalOverlay').classList.add('open');
+  document.body.classList.add('modal-open');
+}
+
+// ── ALL BOOKS (alphabetical with pagination) ──────────────────
+const BOOKS_PER_PAGE = 60;
+let currentPage = 1;
+let filteredBooks = null;
+
+function sortedAlpha(){
+  return [...ALL_BOOKS].sort((a,b)=>cleanTitle(a.title).localeCompare(cleanTitle(b.title),'es'));
+}
+
+function renderAllBooks(page=1){
+  currentPage = page;
+  const books = filteredBooks || sortedAlpha();
+  const total = books.length;
+  const pages = Math.ceil(total / BOOKS_PER_PAGE);
+  const start = (page-1)*BOOKS_PER_PAGE;
+  const slice = books.slice(start, start+BOOKS_PER_PAGE);
+
+  const grid = document.getElementById('alphaGrid');
+  grid.innerHTML = slice.map(bookCard).join('');
+
+  // Pagination
+  const pag = document.getElementById('pagination');
+  if(pages <= 1){ pag.innerHTML=''; return; }
+  let html = '';
+  if(page>1) html+=`<button class="page-btn" onclick="renderAllBooks(${page-1})">← Ant</button>`;
+  // Show window of pages
+  const start_p = Math.max(1, page-3);
+  const end_p = Math.min(pages, page+3);
+  if(start_p>1) html+=`<button class="page-btn" onclick="renderAllBooks(1)">1</button><span style="padding:8px;color:var(--muted)">…</span>`;
+  for(let p=start_p;p<=end_p;p++){
+    html+=`<button class="page-btn${p===page?' active':''}" onclick="renderAllBooks(${p})">${p}</button>`;
+  }
+  if(end_p<pages) html+=`<span style="padding:8px;color:var(--muted)">…</span><button class="page-btn" onclick="renderAllBooks(${pages})">${pages}</button>`;
+  if(page<pages) html+=`<button class="page-btn" onclick="renderAllBooks(${page+1})">Sig →</button>`;
+  pag.innerHTML = html;
+}
+
+// ── SEARCH ────────────────────────────────────────────────────
+function initSearch(){
+  const input = document.getElementById('searchInput');
+  const resultsEl = document.getElementById('searchResults');
+  const countEl = document.getElementById('searchCount');
+  const alphaEl = document.getElementById('alphaGrid');
+  const pagEl = document.getElementById('pagination');
+
+  input.addEventListener('input', ()=>{
+    const q = input.value.trim().toLowerCase();
+    if(!q){
+      resultsEl.classList.remove('active');
+      resultsEl.innerHTML='';
+      countEl.textContent='';
+      filteredBooks = null;
+      alphaEl.style.display='';
+      pagEl.style.display='';
+      renderAllBooks(1);
+      return;
+    }
+    const matches = ALL_BOOKS.filter(b=>
+      cleanTitle(b.title).toLowerCase().includes(q) ||
+      (b.author||'').toLowerCase().includes(q) ||
+      (b.isbn||'').includes(q)
+    );
+    filteredBooks = matches;
+    countEl.textContent = matches.length + ' resultado' + (matches.length!==1?'s':'');
+    resultsEl.innerHTML = matches.slice(0,30).map(bookCard).join('');
+    resultsEl.classList.add('active');
+    // Hide alpha grid and pagination when searching
+    alphaEl.style.display='none';
+    pagEl.style.display='none';
+  });
 }
 
 function renderCurrent(){
@@ -469,6 +597,8 @@ document.addEventListener('DOMContentLoaded',()=>{
   renderHeaderPills(); renderStats(); renderYearChart(); renderRatingBars();
   renderRecent(); renderFeatured(); renderTop(); renderShelf();
   renderAuthors(); renderCurrent();
+  renderAllBooks(1);
+  initSearch();
   setTimeout(()=>document.querySelectorAll('.fi').forEach(el=>io.observe(el)),100);
 });
 </script>
