@@ -17,9 +17,129 @@ import hashlib
 from datetime import datetime
 from pathlib import Path
 
+import csv
+
 GOODREADS_USER_ID = "7001188"
 OUTPUT_FILE  = Path(__file__).parent.parent / "index.html"
-COVERS_DIR   = Path(__file__).parent.parent / "covers"   # stored in repo
+COVERS_DIR   = Path(__file__).parent.parent / "covers"
+CSV_FILE     = Path(__file__).parent.parent / "goodreads_library_export.csv"
+
+# ── CSV LOADER ────────────────────────────────────────────────────────────────
+
+def load_csv():
+    """
+    Load the Goodreads CSV export as a dict keyed by book_id.
+    Used to enrich RSS data with pages, dates and ratings for books
+    that the RSS misses (no date_read set).
+    """
+    if not CSV_FILE.exists():
+        print("  INFO: No CSV file found, skipping CSV enrichment.")
+        return {}
+
+    books = {}
+    with open(CSV_FILE, encoding="utf-8", errors="replace") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            # Clean book id
+            try:
+                book_id = int(row.get("Book Id", 0) or 0)
+            except ValueError:
+                book_id = 0
+
+            # Clean ISBN
+            def clean_isbn(val):
+                digits = re.sub(r"[^0-9]", "", str(val or ""))
+                return digits if len(digits) >= 10 else ""
+
+            isbn = clean_isbn(row.get("ISBN13", "")) or clean_isbn(row.get("ISBN", ""))
+
+            # Pages
+            try:
+                pages = int(row.get("Number of Pages", 0) or 0)
+            except ValueError:
+                pages = 0
+
+            # Rating
+            try:
+                rating = int(row.get("My Rating", 0) or 0)
+            except ValueError:
+                rating = 0
+
+            # Avg rating
+            try:
+                avg_rating = float(row.get("Average Rating", 0) or 0)
+            except ValueError:
+                avg_rating = 0.0
+
+            # Date read
+            date_read_raw = row.get("Date Read", "").strip()
+            date_read = ""
+            date_read_iso = ""
+            if date_read_raw:
+                try:
+                    dt = datetime.strptime(date_read_raw, "%Y/%m/%d")
+                    date_read = dt.strftime("%d %b %Y")
+                    date_read_iso = dt.strftime("%Y-%m-%d")
+                except Exception:
+                    date_read_iso = date_read_raw[:10]
+
+            shelf = row.get("Exclusive Shelf", "").strip()
+
+            books[book_id] = {
+                "id": book_id,
+                "title": row.get("Title", "").strip(),
+                "author": row.get("Author", "").strip(),
+                "isbn": isbn,
+                "rating": rating,
+                "avg_rating": avg_rating,
+                "pages": pages,
+                "date": date_read,
+                "date_iso": date_read_iso,
+                "date_added": row.get("Date Added", "")[:10],
+                "publisher": row.get("Publisher", "").strip(),
+                "binding": row.get("Binding", "").strip(),
+                "year_pub": row.get("Year Published", "").strip(),
+                "review": re.sub(r"<[^>]+>", " ", row.get("My Review", "") or "").strip(),
+                "link": f"https://www.goodreads.com/book/show/{book_id}" if book_id else "",
+                "image_url": "",
+                "shelf": shelf,
+            }
+
+    print(f"  Loaded {len(books)} books from CSV")
+    return books
+
+def merge_rss_and_csv(rss_books, csv_books):
+    """
+    Merge RSS books (fresh, has image_url) with CSV books (complete, has pages).
+    Strategy:
+    - RSS books are authoritative for recent data (image_url, date_read)
+    - CSV fills in pages, and adds books missing from RSS (no date_read)
+    - Result is deduplicated by book_id
+    """
+    merged = {}
+
+    # Start with CSV books as the base (all books)
+    for book_id, b in csv_books.items():
+        if b["shelf"] == "read":
+            merged[book_id] = dict(b)
+
+    # Overlay RSS data (more accurate dates, image_url, reviews)
+    for b in rss_books:
+        book_id = b["id"]
+        if book_id in merged:
+            # Update with RSS data but keep CSV pages if RSS has none
+            csv_pages = merged[book_id].get("pages", 0)
+            merged[book_id].update(b)
+            if not b.get("pages") and csv_pages:
+                merged[book_id]["pages"] = csv_pages
+        else:
+            merged[book_id] = dict(b)
+
+    result = list(merged.values())
+    # Sort by date read descending
+    result.sort(key=lambda b: b.get("date_iso", ""), reverse=True)
+    print(f"  Merged total: {len(result)} read books")
+    return result
 
 # ── COVER DOWNLOADER ──────────────────────────────────────────────────────────
 
@@ -825,6 +945,12 @@ def main():
         print("ERROR: No books fetched. Check that your Goodreads shelves are public.")
         print("Go to: Goodreads → Settings → Privacy → set to Everyone")
         sys.exit(1)
+
+    # Load CSV and merge with RSS for complete book list
+    print("\nLoading CSV backup...")
+    csv_books = load_csv()
+    if csv_books:
+        read_books = merge_rss_and_csv(read_books, csv_books)
 
     # Download covers and replace image_url with local path
     all_books = read_books + current_books + toread_books
