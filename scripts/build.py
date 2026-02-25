@@ -388,16 +388,11 @@ def process_data(read_books, current_books, toread_books):
     ratings = [{"stars": s, "count": rating_counts.get(s, 0)}
                for s in sorted(rating_counts.keys(), reverse=True)]
 
-    # Recent reads: prioritize books with image_url
+    # Recent reads: truly most recent 9, regardless of whether they have a cover
     recent = sorted(
-        [b for b in read_books if b.get("image_url")],
+        [b for b in read_books if b.get("date_iso")],
         key=lambda b: b["date_iso"], reverse=True
     )[:9]
-    # Fill up to 9 if not enough with images
-    if len(recent) < 9:
-        seen = {b["id"] for b in recent}
-        extra = [b for b in read_books if b["id"] not in seen][:9-len(recent)]
-        recent += extra
 
     # Top 5-star books with images
     top5 = sorted(
@@ -518,7 +513,23 @@ header h1 em{font-style:italic;color:var(--amber-light)}
 nav{background:var(--ink);border-top:1px solid rgba(247,242,232,.08);position:sticky;top:0;z-index:200}
 .nav-inner{max-width:1100px;margin:0 auto;padding:0 40px;display:flex;overflow-x:auto}
 nav a{font-family:'DM Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:rgba(247,242,232,.5);text-decoration:none;padding:16px 20px;border-bottom:2px solid transparent;transition:color .2s,border-color .2s;white-space:nowrap}
-nav a:hover{color:var(--amber-light);border-bottom-color:var(--amber-light)}
+nav a:hover,nav a.active{color:var(--amber-light);border-bottom-color:var(--amber-light)}
+/* SEARCH BAR */
+.search-wrap{position:relative;margin-bottom:48px}
+.search-input{width:100%;padding:16px 20px 16px 48px;font-family:'Lora',serif;font-size:16px;font-style:italic;background:var(--cream);border:1px solid var(--line);border-radius:2px;color:var(--ink);outline:none;transition:border-color .2s,box-shadow .2s}
+.search-input:focus{border-color:var(--amber);box-shadow:0 0 0 3px rgba(200,136,42,.1)}
+.search-input::placeholder{color:var(--muted)}
+.search-icon{position:absolute;left:16px;top:50%;transform:translateY(-50%);color:var(--amber);font-size:18px;pointer-events:none}
+.search-count{position:absolute;right:16px;top:50%;transform:translateY(-50%);font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:1px}
+.search-results{display:none}
+.search-results.active{display:grid;grid-template-columns:repeat(3,1fr);gap:28px}
+/* ALL BOOKS */
+.books-alpha{display:grid;grid-template-columns:repeat(3,1fr);gap:28px}
+.books-alpha-row{display:contents}
+.alpha-letter{grid-column:1/-1;font-family:'Playfair Display',serif;font-size:32px;font-weight:900;color:var(--amber);padding:24px 0 8px;border-bottom:1px solid var(--line);margin-top:16px}
+.pagination{display:flex;justify-content:center;gap:8px;margin-top:48px;flex-wrap:wrap}
+.page-btn{font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1px;background:var(--cream);border:1px solid var(--line);padding:8px 14px;cursor:pointer;border-radius:2px;transition:background .2s,color .2s;color:var(--ink)}
+.page-btn:hover,.page-btn.active{background:var(--amber);color:var(--paper);border-color:var(--amber)}
 /* MAIN */
 main{max-width:1100px;margin:0 auto;padding:0 40px}
 section{padding:80px 0;border-bottom:1px solid var(--line)}
@@ -704,6 +715,7 @@ footer strong{color:var(--amber-light)}
     <a href="#ultimas">Últimas lecturas</a>
     <a href="#favoritos">Favoritos</a>
     <a href="#estanteria">Estantería</a>
+    <a href="#mislibros">Mis libros</a>
     <a href="#autores">Autores</a>
     <a href="#leyendo">Leyendo ahora</a>
   </div>
@@ -740,8 +752,21 @@ footer strong{color:var(--amber-light)}
   <section id="autores">
     <p class="s-label">✦ Mis autores</p>
     <h2 class="s-title">Voces que <em>repito</em></h2>
-    <p class="section-note">Autores con 3 o más libros leídos.</p>
+    <p class="section-note">Autores con 3 o más libros leídos. Haz clic para ver todos sus libros.</p>
     <div class="authors-grid fi" id="authorsGrid"></div>
+  </section>
+
+  <section id="mislibros">
+    <p class="s-label">✦ El catálogo completo</p>
+    <h2 class="s-title">Mis <em>libros</em></h2>
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" class="search-input" id="searchInput" placeholder="Buscar por título, autor...">
+      <span class="search-count" id="searchCount"></span>
+    </div>
+    <div class="search-results books-grid" id="searchResults"></div>
+    <div class="books-alpha fi" id="alphaGrid"></div>
+    <div class="pagination" id="pagination"></div>
   </section>
   <section id="leyendo">
     <p class="s-label">✦ Ahora mismo</p>
@@ -913,12 +938,110 @@ function renderShelf(){
 
 function renderAuthors(){
   document.getElementById('authorsGrid').innerHTML=AUTHORS.map(a=>`
-    <div class="author-row">
+    <div class="author-row" onclick="openAuthor(${JSON.stringify(a.name)})" style="cursor:pointer" title="Ver libros de ${esc(a.name)}">
       <span class="a-name">${esc(a.name)}</span>
       <span class="a-books">${a.count} libros</span>
       <span class="a-rating">${a.avg}★</span>
       <span class="a-pages">${(a.pages||0).toLocaleString()} págs</span>
     </div>`).join('');
+}
+
+function openAuthor(authorName){
+  const books = ALL_BOOKS.filter(b => b.author === authorName)
+    .sort((a,b) => (b.date_iso||'').localeCompare(a.date_iso||''));
+  document.getElementById('modalContent').innerHTML = `
+    <div class="modal-header" style="grid-template-columns:1fr">
+      <div class="modal-header-body" style="padding:32px 36px">
+        <p class="modal-badge">✦ ${books.length} libros leídos</p>
+        <h2 class="modal-title">${esc(authorName)}</h2>
+      </div>
+    </div>
+    <div class="modal-body">
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:20px">
+        ${books.map((b,i)=>{
+          const title = cleanTitle(b.title);
+          return `<div onclick='openBook(${JSON.stringify(b)})' style="cursor:pointer;transition:transform .2s" onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform=''">
+            <div style="height:120px;overflow:hidden;border-radius:2px;margin-bottom:8px;background:var(--cream)">${coverHtml(b,i)}</div>
+            <p style="font-family:'Playfair Display',serif;font-size:13px;font-weight:700;line-height:1.3;margin-bottom:3px">${esc(title)}</p>
+            <p style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)">${b.date||''}</p>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  document.getElementById('modalOverlay').classList.add('open');
+  document.body.classList.add('modal-open');
+}
+
+// ── ALL BOOKS (alphabetical with pagination) ──────────────────
+const BOOKS_PER_PAGE = 60;
+let currentPage = 1;
+let filteredBooks = null;
+
+function sortedAlpha(){
+  return [...ALL_BOOKS].sort((a,b)=>cleanTitle(a.title).localeCompare(cleanTitle(b.title),'es'));
+}
+
+function renderAllBooks(page=1){
+  currentPage = page;
+  const books = filteredBooks || sortedAlpha();
+  const total = books.length;
+  const pages = Math.ceil(total / BOOKS_PER_PAGE);
+  const start = (page-1)*BOOKS_PER_PAGE;
+  const slice = books.slice(start, start+BOOKS_PER_PAGE);
+
+  const grid = document.getElementById('alphaGrid');
+  grid.innerHTML = slice.map(bookCard).join('');
+
+  // Pagination
+  const pag = document.getElementById('pagination');
+  if(pages <= 1){ pag.innerHTML=''; return; }
+  let html = '';
+  if(page>1) html+=`<button class="page-btn" onclick="renderAllBooks(${page-1})">← Ant</button>`;
+  // Show window of pages
+  const start_p = Math.max(1, page-3);
+  const end_p = Math.min(pages, page+3);
+  if(start_p>1) html+=`<button class="page-btn" onclick="renderAllBooks(1)">1</button><span style="padding:8px;color:var(--muted)">…</span>`;
+  for(let p=start_p;p<=end_p;p++){
+    html+=`<button class="page-btn${p===page?' active':''}" onclick="renderAllBooks(${p})">${p}</button>`;
+  }
+  if(end_p<pages) html+=`<span style="padding:8px;color:var(--muted)">…</span><button class="page-btn" onclick="renderAllBooks(${pages})">${pages}</button>`;
+  if(page<pages) html+=`<button class="page-btn" onclick="renderAllBooks(${page+1})">Sig →</button>`;
+  pag.innerHTML = html;
+}
+
+// ── SEARCH ────────────────────────────────────────────────────
+function initSearch(){
+  const input = document.getElementById('searchInput');
+  const resultsEl = document.getElementById('searchResults');
+  const countEl = document.getElementById('searchCount');
+  const alphaEl = document.getElementById('alphaGrid');
+  const pagEl = document.getElementById('pagination');
+
+  input.addEventListener('input', ()=>{
+    const q = input.value.trim().toLowerCase();
+    if(!q){
+      resultsEl.classList.remove('active');
+      resultsEl.innerHTML='';
+      countEl.textContent='';
+      filteredBooks = null;
+      alphaEl.style.display='';
+      pagEl.style.display='';
+      renderAllBooks(1);
+      return;
+    }
+    const matches = ALL_BOOKS.filter(b=>
+      cleanTitle(b.title).toLowerCase().includes(q) ||
+      (b.author||'').toLowerCase().includes(q) ||
+      (b.isbn||'').includes(q)
+    );
+    filteredBooks = matches;
+    countEl.textContent = matches.length + ' resultado' + (matches.length!==1?'s':'');
+    resultsEl.innerHTML = matches.slice(0,30).map(bookCard).join('');
+    resultsEl.classList.add('active');
+    // Hide alpha grid and pagination when searching
+    alphaEl.style.display='none';
+    pagEl.style.display='none';
+  });
 }
 
 function renderCurrent(){
@@ -942,6 +1065,8 @@ document.addEventListener('DOMContentLoaded',()=>{
   renderHeaderPills(); renderStats(); renderYearChart(); renderRatingBars();
   renderRecent(); renderFeatured(); renderTop(); renderShelf();
   renderAuthors(); renderCurrent();
+  renderAllBooks(1);
+  initSearch();
   setTimeout(()=>document.querySelectorAll('.fi').forEach(el=>io.observe(el)),100);
 });
 </script>
