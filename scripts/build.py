@@ -713,7 +713,6 @@ footer strong{color:var(--amber-light)}
   <div class="nav-inner">
     <a href="#estadisticas">Estadísticas</a>
     <a href="#ultimas">Últimas lecturas</a>
-    <a href="#favoritos">Favoritos</a>
     <a href="#estanteria">Estantería</a>
     <a href="#mislibros">Mis libros</a>
     <a href="#autores">Autores</a>
@@ -735,13 +734,6 @@ footer strong{color:var(--amber-light)}
     <h2 class="s-title">Últimas <em>lecturas</em></h2>
     <div class="ornament">— ✦ —</div>
     <div class="books-grid fi" id="recentGrid"></div>
-  </section>
-  <section id="favoritos">
-    <p class="s-label">✦ Destacados</p>
-    <h2 class="s-title">Mis libros <em>favoritos</em></h2>
-    <div class="ornament">— ✦ —</div>
-    <div id="featuredBook" class="fi"></div>
-    <div class="books-grid fi" id="topGrid"></div>
   </section>
   <section id="estanteria">
     <p class="s-label">✦ Visualmente</p>
@@ -789,18 +781,19 @@ function cleanTitle(t){return String(t||'').replace(/\s*\([^)]*[Ee]dition[^)]*\)
 
 function coverHtml(b, idx=0){
   const title = cleanTitle(b.title);
-  const ph = `<div class="cover-ph ${PLH[idx%5]}"><span class="cover-ph-text">${esc(title)}</span></div>`;
-  // Use image_url from RSS (Goodreads CDN) — works perfectly on web
+  const ph = `<div class="cover-ph ${PLH[idx%5]}" style="display:none"><span class="cover-ph-text">${esc(title)}</span></div>`;
+  const phVisible = `<div class="cover-ph ${PLH[idx%5]}"><span class="cover-ph-text">${esc(title)}</span></div>`;
+  // Local cover (downloaded by build.py into /covers/)
   if(b.image_url && !b.image_url.includes('nophoto')){
     return `<img src="${esc(b.image_url)}" alt="${esc(title)}" loading="lazy"
-      onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">${ph.replace('style="display:none"','').replace('<div','<div style="display:none"')}`;
+      onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">${ph}`;
   }
-  // Fallback: try Open Library by ISBN
+  // Fallback: Open Library by ISBN
   if(b.isbn){
     return `<img src="https://covers.openlibrary.org/b/isbn/${b.isbn}-M.jpg" alt="${esc(title)}" loading="lazy"
-      onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">${ph.replace('style="display:none"','').replace('<div','<div style="display:none"')}`;
+      onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">${ph}`;
   }
-  return ph;
+  return phVisible;
 }
 
 // Build fast lookup index
@@ -1063,7 +1056,7 @@ const io=new IntersectionObserver(entries=>entries.forEach(e=>{if(e.isIntersecti
 
 document.addEventListener('DOMContentLoaded',()=>{
   renderHeaderPills(); renderStats(); renderYearChart(); renderRatingBars();
-  renderRecent(); renderFeatured(); renderTop(); renderShelf();
+  renderRecent(); renderShelf();
   renderAuthors(); renderCurrent();
   renderAllBooks(1);
   initSearch();
