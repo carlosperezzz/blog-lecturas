@@ -116,27 +116,50 @@ def merge_rss_and_csv(rss_books, csv_books):
     - CSV fills in pages, and adds books missing from RSS (no date_read)
     - Result is deduplicated by book_id
     """
+    # Build title index from CSV for fuzzy matching when id=0
+    csv_by_title = {}
+    for book_id, b in csv_books.items():
+        key = b["title"].strip().lower()[:60]
+        csv_by_title[key] = book_id
+
     merged = {}
 
-    # Start with CSV books as the base (all books)
+    # Start with CSV books as the base (all 1372 books)
     for book_id, b in csv_books.items():
         if b["shelf"] == "read":
             merged[book_id] = dict(b)
 
-    # Overlay RSS data (more accurate dates, image_url, reviews)
+    print(f"  CSV read books: {len(merged)}")
+
+    # Overlay RSS data: adds image_url and fresher dates
+    rss_matched = 0
+    rss_new = 0
     for b in rss_books:
         book_id = b["id"]
-        if book_id in merged:
-            # Update with RSS data but keep CSV pages if RSS has none
+
+        # If id=0, try to match by title
+        if not book_id:
+            title_key = b["title"].strip().lower()[:60]
+            book_id = csv_by_title.get(title_key, 0)
+
+        if book_id and book_id in merged:
+            # Enrich existing CSV entry with RSS data
             csv_pages = merged[book_id].get("pages", 0)
+            csv_review = merged[book_id].get("review", "")
             merged[book_id].update(b)
+            merged[book_id]["id"] = book_id
+            # Prefer CSV pages (RSS has none) and longer review
             if not b.get("pages") and csv_pages:
                 merged[book_id]["pages"] = csv_pages
-        else:
-            merged[book_id] = dict(b)
+            if len(csv_review) > len(b.get("review", "")):
+                merged[book_id]["review"] = csv_review
+            rss_matched += 1
+        # If book_id=0 and not in CSV, skip — don't add duplicates
+
+    print(f"  RSS books matched to CSV: {rss_matched}")
+    print(f"  New books only in RSS (no date in CSV): {rss_new}")
 
     result = list(merged.values())
-    # Sort by date read descending
     result.sort(key=lambda b: b.get("date_iso", ""), reverse=True)
     print(f"  Merged total: {len(result)} read books")
     return result
