@@ -783,17 +783,39 @@ function coverHtml(b, idx=0){
   const title = cleanTitle(b.title);
   const ph = `<div class="cover-ph ${PLH[idx%5]}" style="display:none"><span class="cover-ph-text">${esc(title)}</span></div>`;
   const phVisible = `<div class="cover-ph ${PLH[idx%5]}"><span class="cover-ph-text">${esc(title)}</span></div>`;
-  // Local cover (downloaded by build.py into /covers/)
-  if(b.image_url && !b.image_url.includes('nophoto')){
-    return `<img src="${esc(b.image_url)}" alt="${esc(title)}" loading="lazy"
-      onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">${ph}`;
-  }
-  // Fallback: Open Library by ISBN
+
+  // Build fallback chain
+  const sources = [];
+  if(b.image_url && !b.image_url.includes('nophoto')) sources.push(b.image_url);
   if(b.isbn){
-    return `<img src="https://covers.openlibrary.org/b/isbn/${b.isbn}-M.jpg" alt="${esc(title)}" loading="lazy"
-      onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">${ph}`;
+    sources.push(`https://covers.openlibrary.org/b/isbn/${b.isbn}-M.jpg`);
+    sources.push(`https://covers.openlibrary.org/b/isbn/${b.isbn}-S.jpg`);
   }
-  return phVisible;
+  if(b.id) sources.push(`https://covers.openlibrary.org/b/goodreads/${b.id}-M.jpg`);
+
+  if(sources.length === 0) return phVisible;
+
+  // Chain: first img tries sources[0], on error tries next, etc.
+  // We do this with a small inline script approach using data attributes
+  const srcList = sources.map(s=>esc(s)).join('|');
+  return `<img src="${sources[0]}" alt="${esc(title)}" loading="lazy"
+    data-fallbacks="${srcList}"
+    onerror="nextCover(this)">${ph}`;
+}
+
+// Cover fallback chain
+function nextCover(img){
+  const fallbacks = (img.dataset.fallbacks||'').split('|').filter(Boolean);
+  const current = img.src;
+  const idx = fallbacks.indexOf(current);
+  if(idx >= 0 && idx < fallbacks.length - 1){
+    img.src = fallbacks[idx + 1];
+  } else {
+    // All sources failed — show placeholder
+    img.style.display = 'none';
+    const ph = img.nextElementSibling;
+    if(ph) ph.style.display = 'flex';
+  }
 }
 
 // Build fast lookup index
