@@ -7,6 +7,7 @@ Run in CI:    same command, triggered by GitHub Actions
 
 import urllib.request
 import urllib.error
+import urllib.parse
 import xml.etree.ElementTree as ET
 import json
 import re
@@ -187,15 +188,37 @@ def download_cover(url, dest_path):
     except Exception:
         return False
 
+def search_cover_by_title(title, author):
+    """Search Open Library for a cover URL using title+author. Returns URL or None."""
+    try:
+        query = urllib.parse.quote(f"{title} {author}")
+        url = f"https://openlibrary.org/search.json?q={query}&limit=3&fields=cover_i,isbn"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+        docs = data.get("docs", [])
+        for doc in docs:
+            # Try cover_i (Open Library cover ID)
+            if doc.get("cover_i"):
+                return f"https://covers.openlibrary.org/b/id/{doc['cover_i']}-M.jpg"
+            # Try first ISBN found
+            isbns = doc.get("isbn", [])
+            if isbns:
+                return f"https://covers.openlibrary.org/b/isbn/{isbns[0]}-M.jpg"
+    except Exception:
+        pass
+    return None
+
 def ensure_covers(books):
     """
     Download missing covers for all books.
     Skips books whose cover file already exists (cache).
-    Returns dict: book_id/isbn -> relative URL path like 'covers/123.jpg'
+    Returns dict: fname -> relative URL path like 'covers/123.jpg'
     """
     COVERS_DIR.mkdir(exist_ok=True)
     cover_map = {}
     total = len(books)
+    new_downloads = 0
 
     for i, b in enumerate(books):
         fname = cover_filename(b.get("id"), b.get("isbn", ""))
@@ -210,7 +233,7 @@ def ensure_covers(books):
             cover_map[fname] = rel_path
             continue
 
-        # Try sources in order: Goodreads RSS image → Open Library ISBN
+        # Build source list
         sources = []
         if b.get("image_url") and "nophoto" not in b.get("image_url", ""):
             sources.append(b["image_url"])
@@ -223,16 +246,25 @@ def ensure_covers(books):
             if download_cover(url, dest):
                 cover_map[fname] = rel_path
                 downloaded = True
-                print(f"  [{i+1}/{total}] ✓ {b.get('title','')[:40]}")
+                new_downloads += 1
+                print(f"  [{i+1}/{total}] ✓ {b.get('title','')[:45]}")
                 break
+            time.sleep(0.1)
 
-        if not downloaded:
-            print(f"  [{i+1}/{total}] – no cover: {b.get('title','')[:40]}")
+        # Last resort: search by title+author on Open Library
+        if not downloaded and b.get("title"):
+            time.sleep(0.5)
+            search_url = search_cover_by_title(b["title"], b.get("author", ""))
+            if search_url and download_cover(search_url, dest):
+                cover_map[fname] = rel_path
+                new_downloads += 1
+                print(f"  [{i+1}/{total}] ✓ (búsqueda) {b.get('title','')[:40]}")
+            else:
+                print(f"  [{i+1}/{total}] – sin portada: {b.get('title','')[:40]}")
 
-        # Be polite to external servers
-        time.sleep(0.3)
+        time.sleep(0.2)
 
-    print(f"  Covers ready: {len(cover_map)} / {total}")
+    print(f"  Covers ready: {len(cover_map)} / {total} ({new_downloads} nuevas)")
     return cover_map
 
 # ── RSS FETCH ──────────────────────────────────────────────────────────────────
